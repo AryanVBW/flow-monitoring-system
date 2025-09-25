@@ -23,16 +23,18 @@ const int FLOW_SENSOR_PIN = 2;    // Digital pin for flow sensor (interrupt capa
 const int LED_PIN = 13;           // Built-in LED for status indication
 
 // Flow sensor specifications for SEN-HZ21WA
-const float CALIBRATION_FACTOR = 7.5;  // Pulses per liter per minute
-const int SAMPLE_SIZE = 10;             // Moving average sample size
+const float CALIBRATION_FACTOR = 450.0; // Pulses per liter (7.5 Hz per L/min * 60 = 450 pulses/L)
+const int SAMPLE_SIZE = 5;              // Moving average sample size (reduced for faster response)
 const unsigned long MEASUREMENT_INTERVAL = 1000; // Measurement interval in ms
 
 // Global variables
 volatile unsigned long pulseCount = 0;
+volatile unsigned long lastPulseMillis = 0;
 unsigned long lastMeasurementTime = 0;
 float flowRateBuffer[SAMPLE_SIZE];
 int bufferIndex = 0;
 bool bufferFilled = false;
+const unsigned long DEBOUNCE_TIME = 10; // Minimum time between pulses in ms
 
 // System status
 bool sensorConnected = false;
@@ -100,9 +102,15 @@ void loop() {
 
 // Interrupt service routine for pulse counting
 void pulseCounter() {
-  pulseCount++;
-  lastPulseTime = millis();
-  sensorConnected = true;
+  unsigned long currentMillis = millis();
+  
+  // Debounce: ignore pulses that come too quickly (likely noise)
+  if (currentMillis - lastPulseMillis >= DEBOUNCE_TIME) {
+    pulseCount++;
+    lastPulseTime = currentMillis;
+    lastPulseMillis = currentMillis;
+    sensorConnected = true;
+  }
 }
 
 // Calculate flow rate and display results
@@ -114,7 +122,8 @@ void calculateAndDisplayFlow(unsigned long currentTime) {
   interrupts();
   
   // Calculate flow rate in L/min
-  float flowRate = (currentPulseCount / CALIBRATION_FACTOR) * (60000.0 / MEASUREMENT_INTERVAL);
+  // Formula: (pulses / pulses_per_liter) * (60000ms / measurement_interval_ms) = L/min
+  float flowRate = (float(currentPulseCount) / CALIBRATION_FACTOR) * (60000.0 / MEASUREMENT_INTERVAL);
   
   // Apply moving average filter for stable readings
   flowRateBuffer[bufferIndex] = flowRate;
@@ -126,7 +135,9 @@ void calculateAndDisplayFlow(unsigned long currentTime) {
   
   // Calculate total volume (simple integration)
   static float totalVolume = 0.0;
-  totalVolume += (averagedFlowRate * MEASUREMENT_INTERVAL) / 60000.0; // Convert to liters
+  if (averagedFlowRate > 0.01) { // Only accumulate if there's meaningful flow
+    totalVolume += (averagedFlowRate * MEASUREMENT_INTERVAL) / 60000.0; // Convert to liters
+  }
   
   // Determine system status
   String status = getSensorStatus();

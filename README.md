@@ -78,12 +78,21 @@ Yellow Wire (Signal) -> Digital Pin 2
    ```bash
    python flow_monitor_gui.py
    ```
-   
+
    Or specify a specific port:
    ```bash
    python flow_monitor_gui.py /dev/ttyACM0  # Linux/macOS
    python flow_monitor_gui.py COM3         # Windows
    ```
+
+   While running, the top banner now independently tracks:
+
+   - **Serial** — connection to the Arduino
+   - **Data** — freshness of incoming samples (flags stale data after 5s)
+   - **Sensor** — most recent sensor status message
+
+   Use the bottom status strip to see runtime statistics, live flow rate/volume,
+   and time since the latest update.
 
 ## Usage Instructions
 
@@ -115,6 +124,20 @@ Yellow Wire (Signal) -> Digital Pin 2
    - **Reset**: Clear all data and restart measurements
    - **Pause/Resume**: Stop/start data recording
    - **Save Data**: Export current data to CSV file
+
+### Command-line Diagnostics
+
+Use the enhanced CLI tester before launching the GUI to confirm data quality:
+
+```bash
+python connection_test_enhanced.py
+```
+
+- Auto-detects available serial ports and lets you choose interactively
+- Verifies CSV output contains numeric flow and volume values
+- Highlights stale or missing data so you can fix wiring or upload issues early
+
+The quick tester (`quick_test.py`) remains available for a lightweight sanity check.
 
 ### Troubleshooting
 
