@@ -1,21 +1,9 @@
 /*
- * Liquid Flow Measurement System
+ * Simple Liquid Flow Monitor - Fixed Version
  * Arduino Uno + SEN-HZ21WA Water Flow Sensor
  * 
- * Features:
- * - Accurate flow rate measurement in L/min
- * - Stable readings with moving average filter
- * - Real-time serial output for graphing
- * - Connection test functionality
- * - Low power consumption for USB power
- * 
- * Hardware Connections:
- * - SEN-HZ21WA Red wire (VCC) -> Arduino 5V
- * - SEN-HZ21WA Black wire (GND) -> Arduino GND  
- * - SEN-HZ21WA Yellow wire (Signal) -> Arduino Digital Pin 2
- * 
- * Author: Arduino Flow Monitor System
- * Date: September 2025
+ * This version removes the problematic testConnection loop
+ * and starts flow monitoring immediately.
  */
 
 // Pin definitions
@@ -23,9 +11,9 @@ const int FLOW_SENSOR_PIN = 2;    // Digital pin for flow sensor (interrupt capa
 const int LED_PIN = 13;           // Built-in LED for status indication
 
 // Flow sensor specifications for SEN-HZ21WA
-const float CALIBRATION_FACTOR = 7.5; // Original sensor spec: 7.5 Hz per L/min
-const int SAMPLE_SIZE = 3;             // Smaller buffer for faster response
-const unsigned long MEASUREMENT_INTERVAL = 1000; // Measurement interval in ms
+const float CALIBRATION_FACTOR = 7.5; // 7.5 Hz per L/min
+const int SAMPLE_SIZE = 3;             // Buffer size for moving average
+const unsigned long MEASUREMENT_INTERVAL = 1000; // 1 second intervals
 
 // Global variables
 volatile unsigned long pulseCount = 0;
@@ -34,16 +22,14 @@ unsigned long lastMeasurementTime = 0;
 float flowRateBuffer[SAMPLE_SIZE];
 int bufferIndex = 0;
 bool bufferFilled = false;
-const unsigned long DEBOUNCE_TIME = 5; // Shorter debounce for better sensitivity
+const unsigned long DEBOUNCE_TIME = 5; // 5ms debounce
 
-// Additional variables for better flow detection
+// Additional variables
 volatile bool newPulseDetected = false;
 unsigned long totalPulseCount = 0;
-
-// System status
 bool sensorConnected = false;
 unsigned long lastPulseTime = 0;
-const unsigned long CONNECTION_TIMEOUT = 5000; // 5 seconds without pulses = disconnected
+const unsigned long CONNECTION_TIMEOUT = 5000;
 
 void setup() {
   // Initialize serial communication
@@ -61,25 +47,15 @@ void setup() {
     flowRateBuffer[i] = 0.0;
   }
   
-  // Welcome message and quick initialization
-  Serial.println("=== Liquid Flow Measurement System ===");
-  Serial.println("Arduino Uno + SEN-HZ21WA Flow Sensor");
-  Serial.println("Initializing system...");
-  Serial.flush();
-  
-  // Quick connection check (simplified)
-  Serial.println("Arduino-PC connection: OK");
-  Serial.flush();
-  
-  // System ready
-  digitalWrite(LED_PIN, HIGH);
-  delay(500);
-  digitalWrite(LED_PIN, LOW);
-  
-  Serial.println("System ready!");
+  // Simple startup message - NO LOOPS!
+  Serial.println("=== Liquid Flow Monitor - Ready ===");
   Serial.println("CSV Format: Time(ms),FlowRate(L/min),TotalVolume(L),Status,CurrentPulses,TotalPulses");
-  Serial.println("Starting continuous data output...");
-  Serial.println("---");
+  Serial.flush();
+  
+  // Quick LED blink to show ready
+  digitalWrite(LED_PIN, HIGH);
+  delay(200);
+  digitalWrite(LED_PIN, LOW);
   
   lastMeasurementTime = millis();
 }
@@ -115,7 +91,7 @@ void loop() {
 void pulseCounter() {
   unsigned long currentMillis = millis();
   
-  // Debounce: ignore pulses that come too quickly (likely noise)
+  // Debounce: ignore pulses that come too quickly
   if (currentMillis - lastPulseMillis >= DEBOUNCE_TIME) {
     pulseCount++;
     totalPulseCount++;
@@ -144,12 +120,10 @@ void calculateAndDisplayFlow(unsigned long currentTime) {
   pulseCount = 0;
   interrupts();
   
-  // Calculate flow rate in L/min using the correct formula
-  // SEN-HZ21WA: 7.5 Hz per L/min means 7.5 pulses per second for 1 L/min
-  // So for 1 second (1000ms): 7.5 pulses = 1 L/min
-  float flowRate = (float(currentPulseCount) * 60.0) / CALIBRATION_FACTOR; // L/min
+  // Calculate flow rate in L/min
+  float flowRate = (float(currentPulseCount) * 60.0) / CALIBRATION_FACTOR;
   
-  // Apply moving average filter for stable readings
+  // Apply moving average filter
   flowRateBuffer[bufferIndex] = flowRate;
   bufferIndex = (bufferIndex + 1) % SAMPLE_SIZE;
   if (bufferIndex == 0) bufferFilled = true;
@@ -157,30 +131,30 @@ void calculateAndDisplayFlow(unsigned long currentTime) {
   // Calculate averaged flow rate
   float averagedFlowRate = calculateMovingAverage();
   
-  // Calculate total volume (simple integration)
+  // Calculate total volume
   static float totalVolume = 0.0;
-  if (averagedFlowRate > 0.001) { // Lower threshold for better detection
-    totalVolume += (averagedFlowRate * MEASUREMENT_INTERVAL) / 60000.0; // Convert to liters
+  if (averagedFlowRate > 0.001) {
+    totalVolume += (averagedFlowRate * MEASUREMENT_INTERVAL) / 60000.0;
   }
   
   // Determine system status
   String status = getSensorStatus();
   
-  // Always output data, even if zero flow
+  // Output CSV data
   Serial.print(currentTime);
   Serial.print(",");
-  Serial.print(averagedFlowRate, 4); // More precision
+  Serial.print(averagedFlowRate, 4);
   Serial.print(",");
-  Serial.print(totalVolume, 5); // More precision
+  Serial.print(totalVolume, 5);
   Serial.print(",");
   Serial.print(status);
   Serial.print(",");
-  Serial.print(currentPulseCount); // Add raw pulse count for debugging
+  Serial.print(currentPulseCount);
   Serial.print(",");
-  Serial.println(totalPulseCount); // Add total pulse count for debugging
+  Serial.println(totalPulseCount);
 }
 
-// Calculate moving average for stable readings
+// Calculate moving average
 float calculateMovingAverage() {
   float sum = 0.0;
   int count = bufferFilled ? SAMPLE_SIZE : bufferIndex;
@@ -196,7 +170,6 @@ float calculateMovingAverage() {
 void checkSensorConnection() {
   unsigned long currentTime = millis();
   
-  // If no pulses received for CONNECTION_TIMEOUT, assume disconnected
   if (currentTime - lastPulseTime > CONNECTION_TIMEOUT && lastPulseTime > 0) {
     sensorConnected = false;
   }
@@ -211,41 +184,4 @@ String getSensorStatus() {
   } else {
     return "CONNECTED";
   }
-}
-
-// Test Arduino-PC connection
-void testConnection() {
-  Serial.println("Testing Arduino-PC connection...");
-  Serial.flush(); // Ensure output is sent
-  
-  for (int i = 3; i > 0; i--) {
-    Serial.print("Connection test countdown: ");
-    Serial.println(i);
-    Serial.flush(); // Ensure each message is sent immediately
-    
-    // Blink LED during countdown
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
-    digitalWrite(LED_PIN, LOW);
-    delay(300); // Reduced delay to speed up startup
-  }
-  
-  Serial.println("Arduino-PC connection: OK");
-  Serial.print("Arduino running on USB power: ");
-  Serial.println(analogRead(A0) > 100 ? "OK" : "CHECK_POWER");
-  Serial.flush(); // Ensure final messages are sent
-  
-  delay(500); // Reduced delay
-}
-
-// Function to reset total volume (can be called via serial command)
-void resetTotalVolume() {
-  // This function can be expanded to accept serial commands
-  Serial.println("Volume reset command received");
-}
-
-// Calibration function (for future enhancement)
-void calibrateSensor() {
-  Serial.println("Calibration mode - Pour exactly 1 liter and send 'CAL' command");
-  // Implementation for calibration can be added here
 }
