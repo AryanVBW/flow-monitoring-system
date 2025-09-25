@@ -1,0 +1,6 @@
+# Python dependencies for Liquid Flow Monitor
+# Install with: pip install -r requirements.txt
+
+pyserial>=3.5
+matplotlib>=3.5.0
+numpy>=1.21.0
