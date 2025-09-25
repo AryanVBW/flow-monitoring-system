@@ -1,6 +1,21 @@
-# Python dependencies for Liquid Flow Monitor
+# Cross-Platform Flow Monitor Requirements
+# Compatible with Windows x64, macOS, and Linux
 # Install with: pip install -r requirements.txt
 
+# Core dependencies
 pyserial>=3.5
 matplotlib>=3.5.0
 numpy>=1.21.0
+
+# GUI dependencies (usually included with Python)
+# tkinter - included with Python on Windows
+# For Linux: sudo apt-get install python3-tk
+
+# Optional but recommended
+seaborn>=0.11.0
+
+# Windows-specific optimizations
+pywin32>=227; sys_platform == "win32"
+
+# Development and logging
+wheel>=0.37.0

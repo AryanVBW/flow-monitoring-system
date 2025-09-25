@@ -1,0 +1,11 @@
+2025-09-25 19:19:26,610 - INFO - Starting Flow Monitor on Darwin arm64
+2025-09-25 19:19:26,924 - INFO - Found 6 serial ports
+2025-09-25 19:19:27,483 - INFO - Starting Cross-Platform Flow Monitor GUI
+2025-09-25 19:20:51,888 - INFO - Found 7 serial ports
+2025-09-25 19:20:57,300 - INFO - Attempting to connect to /dev/cu.usbserial-110
+2025-09-25 19:20:58,321 - INFO - Started data reading thread
+2025-09-25 19:20:58,321 - INFO - Successfully connected to /dev/cu.usbserial-110
+2025-09-25 19:21:09,449 - ERROR - Serial error (1/5): read failed: [Errno 9] Bad file descriptor
+2025-09-25 19:21:09,555 - INFO - Data reading thread stopped
+2025-09-25 19:21:09,956 - INFO - Disconnected from Arduino
+2025-09-25 19:21:10,600 - INFO - Application closed
