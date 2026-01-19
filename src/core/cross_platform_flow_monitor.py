@@ -230,12 +230,21 @@ class CrossPlatformFlowMonitor:
         self.ax2.set_ylabel("Total Volume (L)")
         self.ax2.grid(True, alpha=0.3)
 
-        # Plot lines
-        (self.line1,) = self.ax1.plot([], [], "b-", linewidth=2, label="Flow Rate")
-        (self.line2,) = self.ax2.plot([], [], "r-", linewidth=2, label="Total Volume")
+        # Plot lines with initial data point to ensure lines are visible
+        (self.line1,) = self.ax1.plot([0], [0], "b-", linewidth=2, label="Flow Rate")
+        (self.line2,) = self.ax2.plot([0], [0], "r-", linewidth=2, label="Total Volume")
 
-        self.ax1.legend()
-        self.ax2.legend()
+        # Set initial axis limits so the plot is visible from the start
+        self.ax1.set_xlim(0, 10)
+        self.ax1.set_ylim(0, 1)
+        self.ax2.set_xlim(0, 10)
+        self.ax2.set_ylim(0, 0.1)
+
+        self.ax1.legend(loc="upper right")
+        self.ax2.legend(loc="upper left")
+
+        # Apply tight layout
+        self.fig.tight_layout()
 
         # Embed in tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, self.root)
@@ -246,6 +255,9 @@ class CrossPlatformFlowMonitor:
 
         toolbar = NavigationToolbar2Tk(self.canvas, self.root)
         toolbar.update()
+
+        # Initial draw to display the empty graph
+        self.canvas.draw()
 
     def setup_status_bar(self):
         """Setup status bar"""
@@ -539,13 +551,23 @@ class CrossPlatformFlowMonitor:
     def start_animation(self):
         """Start plot animation"""
         try:
+            # Initial draw to ensure canvas is ready
+            self.canvas.draw()
+
+            # Create animation with proper settings for tkinter
             self.animation = animation.FuncAnimation(
                 self.fig,
                 self.animate,
                 interval=PLOT_REFRESH_MS,
                 blit=False,
                 cache_frame_data=False,
+                save_count=100,
             )
+
+            # Force initial canvas update
+            self.canvas.draw_idle()
+            logger.info("Animation started successfully")
+
         except Exception as e:
             logger.error(f"Error starting animation: {e}")
 
@@ -554,32 +576,61 @@ class CrossPlatformFlowMonitor:
         try:
             with self.thread_lock:
                 if not self.timestamps:
+                    # Still draw the empty graph
+                    self.canvas.draw_idle()
                     return self.line1, self.line2
 
                 times = list(self.timestamps)
                 flows = list(self.flow_rates)
                 volumes = list(self.total_volumes)
 
+            # Ensure we have valid data
+            if not times or not flows or not volumes:
+                return self.line1, self.line2
+
             # Update plot data
             self.line1.set_data(times, flows)
             self.line2.set_data(times, volumes)
 
-            # Auto-scale plots
+            # Auto-scale plots with proper X and Y axis limits
             if times and flows:
-                for ax, data in [(self.ax1, flows), (self.ax2, volumes)]:
-                    ax.relim()
-                    ax.autoscale_view()
+                # Set X-axis limits for both plots
+                time_min = min(times)
+                time_max = max(times)
+                time_padding = max(
+                    1.0, (time_max - time_min) * 0.05
+                )  # 5% padding or at least 1 second
 
-                    if max(data) > 0:
-                        ax.set_ylim(bottom=0, top=max(data) * 1.1)
-                    else:
-                        ax.set_ylim(bottom=0, top=1)
+                self.ax1.set_xlim(time_min - time_padding, time_max + time_padding)
+                self.ax2.set_xlim(time_min - time_padding, time_max + time_padding)
 
-            # Update status
+                # Set Y-axis limits with proper scaling
+                max_flow = max(flows) if flows else 0
+                max_volume = max(volumes) if volumes else 0
+
+                # Flow rate Y-axis
+                if max_flow > 0:
+                    self.ax1.set_ylim(bottom=0, top=max_flow * 1.15)
+                else:
+                    self.ax1.set_ylim(bottom=0, top=1)
+
+                # Volume Y-axis
+                if max_volume > 0:
+                    self.ax2.set_ylim(bottom=0, top=max_volume * 1.15)
+                else:
+                    self.ax2.set_ylim(bottom=0, top=0.1)
+
+            # Update status display
             self.update_status(flows, volumes, times)
+
+            # CRITICAL: Force canvas to redraw the updated plot
+            self.canvas.draw_idle()
 
         except Exception as e:
             logger.error(f"Animation error: {e}")
+            import traceback
+
+            logger.error(traceback.format_exc())
 
         return self.line1, self.line2
 
